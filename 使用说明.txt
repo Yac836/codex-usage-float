@@ -1,0 +1,23 @@
+﻿Codex Usage Float — Windows 便携版
+
+开始使用
+1. 把整个 ZIP 解压到一个文件夹。
+2. 双击 CodexUsageFloat.exe，桌面会出现额度悬浮窗。
+3. 拖动窗口调整位置，右键打开设置。
+
+本机需要 Windows 10/11 64 位、.NET Framework 4.8，以及已安装并登录的 Codex。
+本工具无需安装、编译或运行 PowerShell 脚本，也不需要填写 API Key。
+
+常用操作
+- 5小时、每周、重置卡：右键“显示项目”分别开启或隐藏。
+- 圆形或卡片：右键“样式”切换。
+- 贴边收起：拖到屏幕边缘，移开鼠标后收起，鼠标移入小条展开。
+- 刷新：每分钟自动读取，双击窗口可立即刷新。
+- 找回窗口：再次双击 CodexUsageFloat.exe，会展开并居中。
+- 退出：右键选择“退出”。
+
+重置卡只显示可用张数和最先到期日期，不会自动使用。悬停可查看已返回的明细。
+如果提示找不到 Codex 或未登录，请先安装并打开本机 Codex 完成登录，再双击悬浮窗刷新。
+
+项目和更新：https://github.com/Yac836/codex-usage-float
+下载 Release：https://github.com/Yac836/codex-usage-float/releases

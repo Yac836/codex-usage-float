@@ -4,13 +4,21 @@ A small, read-only Codex quota widget for Windows. 界面目前为中文。
 
 在桌面常驻显示 Codex 的 5 小时额度、每周额度和重置卡。三项可分别显示或隐藏，提供圆形仪表和信息卡片两种样式。
 
-## 使用
+## 下载便携版
+
+**[下载 Windows 便携版（ZIP，v1.0.0-preview.1）](https://github.com/Yac836/codex-usage-float/releases/download/v1.0.0-preview.1/CodexUsageFloat-windows-x64.zip)**
+
+[查看 Release 和更新说明](https://github.com/Yac836/codex-usage-float/releases/tag/v1.0.0-preview.1)
+
+下载文件名为 `CodexUsageFloat-windows-x64.zip`。解压后双击 `CodexUsageFloat.exe` 即可启动，无需编译或运行脚本。压缩包内有中文 `使用说明.txt`。
 
 面向 Windows 10/11 x64，需要 .NET Framework 4.8，以及本机已安装并登录的 Codex。没有安装器、开机启动项或额外 NuGet 依赖。
 
-1. 解压便携包，运行 `CodexUsageFloat.exe`。
-2. 拖动窗口改变位置；右键选择样式、显示项目、大小、透明度、置顶和贴边收起。
-3. 每 60 秒查询一次；双击立即刷新。再次运行 EXE 会展开并居中找回已有窗口。
+1. 下载 ZIP，解压到一个文件夹，双击 `CodexUsageFloat.exe`。
+2. 窗口出现后即可查看额度。首次使用前，先在本机 Codex 中完成登录。
+3. 拖动窗口改变位置；右键选择样式、显示项目、大小、透明度、置顶和贴边收起。
+
+每 60 秒查询一次；双击立即刷新。找不到窗口时，再次运行 EXE 会展开并居中找回已有窗口。
 
 蓝色表示 5 小时额度，紫色表示每周额度，金色显示重置卡。默认显示已用比例，可改为剩余。多张卡显示总张数和最先到期日期，悬停查看已返回的明细。未提供的数据显示“—”或缺失提示，不会猜测为零。
 

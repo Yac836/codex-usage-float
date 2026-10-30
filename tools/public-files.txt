@@ -6,6 +6,7 @@
 .github/ISSUE_TEMPLATE/feature_request.yml
 .github/workflows/ci.yml
 README.md
+使用说明.txt
 LICENSE
 CHANGELOG.md
 CONTRIBUTING.md
