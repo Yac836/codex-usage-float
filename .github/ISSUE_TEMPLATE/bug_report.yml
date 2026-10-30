@@ -1,0 +1,27 @@
+name: Bug report
+description: 报告问题，请勿附带认证文件或账户信息
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: Windows 版本、系统缩放、程序版本、样式和显示项目
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重现步骤
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 预期与实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 截图或回归结果（可选）
+      description: 先遮挡个人信息；不要上传 auth.json、令牌、API Key 或聊天记录

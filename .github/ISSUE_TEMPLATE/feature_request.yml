@@ -1,0 +1,9 @@
+name: Feature request
+description: 说明使用场景和希望的行为
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景与需求
+    validations:
+      required: true

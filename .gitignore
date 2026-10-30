@@ -1,0 +1,30 @@
+# Reproducible outputs
+build/
+dist/
+bin/
+obj/
+test-results/
+*.exe
+*.pdb
+*.zip
+*.tmp
+*.log
+.vs/
+
+# Local settings and secrets
+preferences*.json
+auth.json
+.codex/
+.env
+.env.*
+*.db
+*.sqlite*
+*.pem
+*.pfx
+*.key
+
+# Private local development history, never part of the public source bundle
+source/task_plan.md
+source/findings.md
+source/progress.md
+source/VALIDATION.md
