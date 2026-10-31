@@ -364,6 +364,8 @@ namespace CodexUsageFloat
         public bool ShowFiveHour { get; set; }
         public bool ShowWeekly { get; set; }
         public bool ShowResetCredits { get; set; }
+        public bool HotkeyEnabled { get; set; }
+        public int HotkeyKeys { get; set; }
         internal static readonly string Folder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CodexUsageFloat");
         internal static readonly string FilePath = Path.Combine(Folder, "preferences.json");
@@ -375,6 +377,8 @@ namespace CodexUsageFloat
             KeepOnTop = true;
             EdgeAutoHide = true;
             ShowFiveHour = ShowWeekly = ShowResetCredits = true;
+            HotkeyEnabled = true;
+            HotkeyKeys = (int)RevealHotkey.Default;
         }
         internal static Preferences Load(string filePath = null)
         {
@@ -389,9 +393,9 @@ namespace CodexUsageFloat
                         var serializer = Json.Serializer();
                         var raw = Json.Map(serializer.DeserializeObject(File.ReadAllText(target, Encoding.UTF8)));
                         if (raw == null) return new Preferences();
-                        foreach (string key in new[] { "KeepOnTop", "EdgeAutoHide", "CircularStyle", "ShowRemaining", "ShowFiveHour", "ShowWeekly", "ShowResetCredits" })
+                        foreach (string key in new[] { "KeepOnTop", "EdgeAutoHide", "CircularStyle", "ShowRemaining", "ShowFiveHour", "ShowWeekly", "ShowResetCredits", "HotkeyEnabled" })
                             if (raw.ContainsKey(key) && !(raw[key] is bool)) return new Preferences();
-                        foreach (string key in new[] { "SizePercent", "OpacityPercent", "X", "Y" })
+                        foreach (string key in new[] { "SizePercent", "OpacityPercent", "X", "Y", "HotkeyKeys" })
                         {
                             if (!raw.ContainsKey(key) || ((key == "X" || key == "Y") && raw[key] == null)) continue;
                             double? number = Json.Number(raw[key]);
@@ -411,6 +415,7 @@ namespace CodexUsageFloat
                     {
                         if (!new[] { 100, 125, 150 }.Contains(p.SizePercent)) p.SizePercent = 100;
                         if (!new[] { 100, 85, 70 }.Contains(p.OpacityPercent)) p.OpacityPercent = 100;
+                        if (!RevealHotkey.IsValid((Keys)p.HotkeyKeys)) p.HotkeyKeys = (int)RevealHotkey.Default;
                         if (!p.X.HasValue || !p.Y.HasValue || Math.Abs((long)p.X.Value) > 1000000 || Math.Abs((long)p.Y.Value) > 1000000)
                             p.X = p.Y = null;
                         return p;
@@ -541,10 +546,7 @@ namespace CodexUsageFloat
         private readonly System.Windows.Forms.Timer countdown = new System.Windows.Forms.Timer();
         private readonly System.Windows.Forms.Timer refresh = new System.Windows.Forms.Timer();
         private readonly System.Windows.Forms.Timer savePosition = new System.Windows.Forms.Timer();
-        private readonly System.Windows.Forms.Timer verificationEnd = new System.Windows.Forms.Timer();
         private readonly System.Windows.Forms.Timer dockTimer = new System.Windows.Forms.Timer();
-        private readonly List<DateTime> verifiedReads = new List<DateTime>();
-        private int verifiedTicks;
         private readonly ToolTip tip = new ToolTip { AutoPopDelay = 15000, InitialDelay = 300, ReshowDelay = 100 };
         private readonly Label heading = new Label();
         private readonly Label mode = new Label();
@@ -564,6 +566,7 @@ namespace CodexUsageFloat
         private readonly Dictionary<string, Font> fontCache = new Dictionary<string, Font>();
         private UsageSnapshot snapshot;
         private string readError;
+        private bool displayedStale;
         private int reading;
         private bool ready;
         private volatile bool closing;
@@ -747,10 +750,9 @@ namespace CodexUsageFloat
             countdown.Interval = 1000;
             countdown.Tick += delegate
             {
-                if (Program.VerificationReport != null) verifiedTicks++;
                 EnsureTopMost(false);
                 CheckScreenLayout();
-                UpdateDisplay();
+                if (DisplayNeedsUpdate(DateTime.UtcNow)) UpdateDisplay();
             };
             refresh.Interval = 60000;
             refresh.Tick += delegate { StartRefresh(); };
@@ -767,19 +769,16 @@ namespace CodexUsageFloat
             dockTimer.Interval = 180;
             dockTimer.Tick += delegate
             {
-                UpdateDockHover(Cursor.Position, context.Visible, Control.MouseButtons != MouseButtons.None, DateTime.UtcNow);
+                UpdateDockHover(Cursor.Position, context.Visible || editingShortcut, Control.MouseButtons != MouseButtons.None, DateTime.UtcNow);
             };
             MouseEnter += delegate { if (dockCollapsed) ExpandDock(); };
             context.Opening += delegate { ExpandDock(); outsideSince = null; };
             context.Closed += delegate { outsideSince = DateTime.UtcNow; };
-            verificationEnd.Interval = 65000;
-            verificationEnd.Tick += delegate { verificationEnd.Stop(); Close(); };
             Shown += delegate
             {
                 countdown.Start(); refresh.Start(); StartRefresh();
                 UpdateDockAnchor(false);
                 EnsureTopMost(true);
-                if (Program.VerificationReport != null) verificationEnd.Start();
             };
             FormClosing += delegate
             {
@@ -787,29 +786,9 @@ namespace CodexUsageFloat
                 countdown.Stop();
                 refresh.Stop();
                 savePosition.Stop();
-                verificationEnd.Stop();
                 dockTimer.Stop();
                 SavePosition();
                 shutdown.Cancel();
-                if (Program.VerificationReport != null)
-                {
-                    try
-                    {
-                        File.WriteAllText(Program.VerificationReport, Json.Serializer().Serialize(new
-                        {
-                            successfulReadsUtc = verifiedReads,
-                            displayTicks = verifiedTicks,
-                            snapshot = snapshot,
-                            fiveHourText = values[0].Text,
-                            weeklyText = values[1].Text,
-                            fiveHourReset = resets[0].Text,
-                            weeklyReset = resets[1].Text,
-                            status = status.Text
-                        }), new UTF8Encoding(false));
-                    }
-                    catch (IOException) { }
-                    catch (UnauthorizedAccessException) { }
-                }
             };
             InitializeRecovery(hotkey);
         }
@@ -822,7 +801,7 @@ namespace CodexUsageFloat
                 closing = true;
                 DisposeRecovery();
                 shutdown.Cancel();
-                countdown.Dispose(); refresh.Dispose(); savePosition.Dispose(); verificationEnd.Dispose(); dockTimer.Dispose();
+                countdown.Dispose(); refresh.Dispose(); savePosition.Dispose(); dockTimer.Dispose();
                 tip.Dispose();
                 if (context != null) context.Dispose();
                 if (refreshTask == null || refreshTask.IsCompleted) shutdown.Dispose();
@@ -912,8 +891,7 @@ namespace CodexUsageFloat
             get
             {
                 var parameters = base.CreateParams;
-                if (!Program.InspectWindow)
-                    parameters.ExStyle = (parameters.ExStyle | 0x80) & ~0x40000;
+                parameters.ExStyle = (parameters.ExStyle | 0x80) & ~0x40000;
                 return parameters;
             }
         }
@@ -1210,7 +1188,6 @@ namespace CodexUsageFloat
                     if (data != null)
                     {
                         snapshot = data;
-                        if (Program.VerificationReport != null) verifiedReads.Add(data.RetrievedUtc);
                     }
                     readError = failure;
                     UpdateDisplay();
@@ -1218,10 +1195,23 @@ namespace CodexUsageFloat
             });
         }
 
+        private bool IsStale(DateTime now) { return readError != null || (snapshot != null && now - snapshot.RetrievedUtc > TimeSpan.FromMinutes(3)); }
+        private string ResetText(QuotaWindow window, DateTime now)
+        {
+            string text = DisplayText.Countdown(window, now);
+            return preferences.CircularStyle ? text.Replace("后重置", "重置") : text;
+        }
+        private bool DisplayNeedsUpdate(DateTime now)
+        {
+            return displayedStale != IsStale(now) || (snapshot != null &&
+                ((preferences.ShowFiveHour && resets[0].Text != ResetText(snapshot.FiveHour, now)) ||
+                 (preferences.ShowWeekly && resets[1].Text != ResetText(snapshot.Weekly, now))));
+        }
         private void UpdateDisplay()
         {
             if (closing) return;
-            bool stale = readError != null || (snapshot != null && DateTime.UtcNow - snapshot.RetrievedUtc > TimeSpan.FromMinutes(3));
+            DateTime now = DateTime.UtcNow;
+            bool stale = displayedStale = IsStale(now);
             mode.Text = preferences.ShowRemaining ? "剩余额度" : "已使用额度";
             if (!preferences.ShowFiveHour && !preferences.ShowWeekly)
                 mode.Text = preferences.ShowResetCredits ? "重置卡信息" : "全部已隐藏";
@@ -1244,8 +1234,7 @@ namespace CodexUsageFloat
                 names[i].Text = new[] { "5小时", "每周" }[i] +
                     (preferences.CircularStyle ? preferences.ShowRemaining ? "剩余" : "已用" : "");
                 string value = DisplayText.Percent(windows[i], preferences.ShowRemaining);
-                string reset = DisplayText.Countdown(windows[i], DateTime.UtcNow);
-                if (preferences.CircularStyle) reset = reset.Replace("后重置", "重置");
+                string reset = ResetText(windows[i], now);
                 if (values[i].Text != value) { values[i].Text = value; Invalidate(); }
                 if (resets[i].Text != reset) resets[i].Text = reset;
                 values[i].ForeColor = stale || windows[i] == null ? muted : Tone(i, windows[i].UsedPercent);
@@ -1345,6 +1334,11 @@ namespace CodexUsageFloat
 
     internal static class Native
     {
+        [DllImport("user32.dll", SetLastError = true)] internal static extern bool RegisterHotKey(IntPtr window, int id, uint modifiers, uint key);
+        [DllImport("user32.dll")] internal static extern bool UnregisterHotKey(IntPtr window, int id);
+        [DllImport("user32.dll")] internal static extern bool DestroyIcon(IntPtr icon);
+        [DllImport("wtsapi32.dll", SetLastError = true)] internal static extern bool WTSRegisterSessionNotification(IntPtr window, uint flags);
+        [DllImport("wtsapi32.dll")] internal static extern bool WTSUnRegisterSessionNotification(IntPtr window);
         [DllImport("user32.dll")] internal static extern bool ReleaseCapture();
         [DllImport("user32.dll")] internal static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr FindWindow(string className, string title);
@@ -1359,96 +1353,11 @@ namespace CodexUsageFloat
         internal static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
     }
 
-    internal static class SelfTests
-    {
-        internal static object Run()
-        {
-            int count = 0;
-            Action<bool, string> check = delegate(bool pass, string name)
-            {
-                if (!pass) throw new Exception("Self-test failed: " + name);
-                count++;
-            };
-            Func<string, UsageSnapshot> parse = text => UsageSnapshot.Parse(Json.Map(Json.Serializer().DeserializeObject(text)));
-            var both = parse("{\"rateLimitsByLimitId\":{\"codex\":{\"primary\":{\"usedPercent\":12.5,\"windowDurationMins\":300,\"resetsAt\":1793293649},\"secondary\":{\"usedPercent\":7,\"windowDurationMins\":10080,\"resetsAt\":1793880449}}}}");
-            check(both.FiveHour.UsedPercent == 12.5 && both.Weekly.UsedPercent == 7, "both windows mapped by duration");
-            var reversed = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":30,\"windowDurationMins\":10080},\"secondary\":{\"usedPercent\":6,\"windowDurationMins\":300}}}");
-            check(reversed.FiveHour.UsedPercent == 6 && reversed.Weekly.UsedPercent == 30, "reversed order");
-            var partial = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":0,\"windowDurationMins\":300},\"secondary\":null}}");
-            check(partial.Weekly == null && partial.FiveHour.UsedPercent == 0, "missing differs from zero");
-            check(DisplayText.Percent(partial.Weekly, false) == "—", "unavailable placeholder");
-            check(DisplayText.Percent(both.FiveHour, true) == "87.5%", "remaining is complement");
-            bool rejected = false;
-            try { parse("{\"rateLimitsByLimitId\":{\"codex\":null},\"rateLimits\":{\"primary\":{\"usedPercent\":50,\"windowDurationMins\":300}}}"); }
-            catch (UsageException) { rejected = true; }
-            check(rejected, "authoritative keyed null does not reuse legacy data");
-            rejected = false;
-            try { parse("{\"rateLimits\":{\"limitId\":\"other\",\"primary\":{\"usedPercent\":50,\"windowDurationMins\":300}}}"); }
-            catch (UsageException) { rejected = true; }
-            check(rejected, "other buckets rejected");
-            var clamped = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":120,\"windowDurationMins\":300}}}");
-            check(clamped.FiveHour.UsedPercent == 100, "percent clamped");
-            var reset = new QuotaWindow { ResetsAt = 100000, Minutes = 300 };
-            check(DisplayText.Countdown(reset, DisplayText.ResetUtc(100001)) == "等待额度更新", "passed reset not assumed refreshed");
-            check(DisplayText.Countdown(reset, DisplayText.ResetUtc(100000 - 65 * 60)) == "1时5分后重置", "countdown hours");
-            check(DisplayText.Countdown(reset, DisplayText.ResetUtc(100000 - 1500 * 60)) == "1天1时后重置", "countdown days");
-            var settings = new Preferences { X = 50, Y = 100, ShowRemaining = true };
-            var restored = Json.Serializer().Deserialize<Preferences>(Json.Serializer().Serialize(settings));
-            check(restored.X == 50 && restored.Y == 100 && restored.KeepOnTop && restored.ShowRemaining,
-                "display preferences round trip without losing defaults");
-            var cards = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":1,\"windowDurationMins\":300}},\"rateLimitResetCredits\":{\"availableCount\":2}}");
-            check(cards.ResetCreditsCount == 2, "reset credits count is read");
-            cards = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":1,\"windowDurationMins\":300}},\"rateLimitResetCredits\":{\"availableCount\":0}}");
-            check(cards.ResetCreditsCount == 0, "zero reset credits is known zero");
-            check(partial.ResetCreditsCount == null, "missing reset credits remains unknown");
-            var onlyCards = parse("{\"rateLimitResetCredits\":{\"availableCount\":1,\"credits\":[{\"status\":\"available\",\"resetType\":\"codexRateLimits\",\"expiresAt\":1794003813}]}}");
-            check(onlyCards.FiveHour == null && onlyCards.Weekly == null && onlyCards.ResetCreditsCount == 1, "reset credits can be read without quota windows");
-            check(onlyCards.ResetCreditExpiryDates.Count == 1 && onlyCards.ResetCreditExpiryDates[0] == 1794003813, "reset expiry parsed as Unix seconds");
-            check(DisplayText.CreditExpiry(onlyCards).Contains(DisplayText.ResetUtc(1794003813).ToLocalTime().ToString("yyyy-MM-dd HH:mm")), "expiry displays local calendar time");
-            check(DisplayText.CreditExpiry(cards) == "暂无可用重置卡", "zero credits does not display old expiry");
-            var incomplete = parse("{\"rateLimitResetCredits\":{\"availableCount\":2,\"credits\":[{\"status\":\"available\",\"resetType\":\"codexRateLimits\",\"expiresAt\":1794003813},{\"status\":\"consumed\",\"resetType\":\"codexRateLimits\",\"expiresAt\":100000}]}}");
-            check(incomplete.ResetCreditExpiryDates.Count == 1 && DisplayText.CreditExpiry(incomplete).StartsWith("已知到期"), "consumed credits excluded and incomplete detail identified");
-            check(DisplayText.CreditExpiry(parse("{\"rateLimitResetCredits\":{\"availableCount\":1,\"credits\":null}}")) == "未提供到期日期", "unavailable date not invented");
-            var oldPreferences = Json.Serializer().Deserialize<Preferences>("{\"SizePercent\":100,\"OpacityPercent\":85}");
-            check(oldPreferences.ShowFiveHour && oldPreferences.ShowWeekly && oldPreferences.ShowResetCredits, "existing preferences default to showing all three items");
-            var multipleCards = parse("{\"rateLimitResetCredits\":{\"availableCount\":2,\"credits\":[{\"status\":\"available\",\"resetType\":\"codexRateLimits\",\"expiresAt\":1795003813},{\"status\":\"available\",\"resetType\":\"codexRateLimits\",\"expiresAt\":1794003813}]}}");
-            check(multipleCards.ResetCreditsCount == 2 && DisplayText.CreditExpiry(multipleCards) == "最先到期 " + DisplayText.ResetUtc(1794003813).ToLocalTime().ToString("yyyy-MM-dd HH:mm"), "multiple cards keep total count and earliest expiry regardless of response order");
-            return new { passed = count, success = true };
-        }
-    }
-
     internal static class Program
     {
-        internal static bool InspectWindow;
-        internal static string VerificationReport;
         [STAThread]
-        private static int Main(string[] args)
+        private static int Main()
         {
-            if (args.Length >= 2 && (args[0] == "--probe" || args[0] == "--self-test"))
-            {
-                try
-                {
-                    object result;
-                    if (args[0] == "--self-test") result = SelfTests.Run();
-                    else
-                    {
-                        var watch = Stopwatch.StartNew();
-                        var data = new UsageReader().Read(CancellationToken.None);
-                        result = new { success = true, elapsedMs = watch.ElapsedMilliseconds, snapshot = data };
-                    }
-                    File.WriteAllText(args[1], Json.Serializer().Serialize(result), new UTF8Encoding(false));
-                    return 0;
-                }
-                catch (Exception e)
-                {
-                    string error = e is UsageException ? e.Message : e is FileNotFoundException ? "Codex executable not found" : "Diagnostic failed: " + e.GetType().Name;
-                    File.WriteAllText(args[1], Json.Serializer().Serialize(new { success = false, error = error }), new UTF8Encoding(false));
-                    return 1;
-                }
-            }
-
-            if (args.Length >= 2 && args[0] == "--verify-ui") VerificationReport = args[1];
-            InspectWindow = args.Contains("--inspect-window") || VerificationReport != null;
             bool first;
             string identity = WindowsIdentity.GetCurrent().User.Value;
             using (var mutex = new Mutex(true, @"Local\CodexUsageFloat." + identity, out first))

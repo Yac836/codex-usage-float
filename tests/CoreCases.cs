@@ -80,4 +80,62 @@ namespace CodexUsageFloat.Tests
             });
         }
     }
+    internal static class SelfTests
+    {
+        internal static object Run()
+        {
+            int count = 0;
+            Action<bool, string> check = delegate(bool pass, string name)
+            {
+                if (!pass) throw new Exception("Self-test failed: " + name);
+                count++;
+            };
+            Func<string, UsageSnapshot> parse = text => UsageSnapshot.Parse(Json.Map(Json.Serializer().DeserializeObject(text)));
+            var both = parse("{\"rateLimitsByLimitId\":{\"codex\":{\"primary\":{\"usedPercent\":12.5,\"windowDurationMins\":300,\"resetsAt\":1793293649},\"secondary\":{\"usedPercent\":7,\"windowDurationMins\":10080,\"resetsAt\":1793880449}}}}");
+            check(both.FiveHour.UsedPercent == 12.5 && both.Weekly.UsedPercent == 7, "both windows mapped by duration");
+            var reversed = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":30,\"windowDurationMins\":10080},\"secondary\":{\"usedPercent\":6,\"windowDurationMins\":300}}}");
+            check(reversed.FiveHour.UsedPercent == 6 && reversed.Weekly.UsedPercent == 30, "reversed order");
+            var partial = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":0,\"windowDurationMins\":300},\"secondary\":null}}");
+            check(partial.Weekly == null && partial.FiveHour.UsedPercent == 0, "missing differs from zero");
+            check(DisplayText.Percent(partial.Weekly, false) == "—", "unavailable placeholder");
+            check(DisplayText.Percent(both.FiveHour, true) == "87.5%", "remaining is complement");
+            bool rejected = false;
+            try { parse("{\"rateLimitsByLimitId\":{\"codex\":null},\"rateLimits\":{\"primary\":{\"usedPercent\":50,\"windowDurationMins\":300}}}"); }
+            catch (UsageException) { rejected = true; }
+            check(rejected, "authoritative keyed null does not reuse legacy data");
+            rejected = false;
+            try { parse("{\"rateLimits\":{\"limitId\":\"other\",\"primary\":{\"usedPercent\":50,\"windowDurationMins\":300}}}"); }
+            catch (UsageException) { rejected = true; }
+            check(rejected, "other buckets rejected");
+            var clamped = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":120,\"windowDurationMins\":300}}}");
+            check(clamped.FiveHour.UsedPercent == 100, "percent clamped");
+            var reset = new QuotaWindow { ResetsAt = 100000, Minutes = 300 };
+            check(DisplayText.Countdown(reset, DisplayText.ResetUtc(100001)) == "等待额度更新", "passed reset not assumed refreshed");
+            check(DisplayText.Countdown(reset, DisplayText.ResetUtc(100000 - 65 * 60)) == "1时5分后重置", "countdown hours");
+            check(DisplayText.Countdown(reset, DisplayText.ResetUtc(100000 - 1500 * 60)) == "1天1时后重置", "countdown days");
+            var settings = new Preferences { X = 50, Y = 100, ShowRemaining = true };
+            var restored = Json.Serializer().Deserialize<Preferences>(Json.Serializer().Serialize(settings));
+            check(restored.X == 50 && restored.Y == 100 && restored.KeepOnTop && restored.ShowRemaining,
+                "display preferences round trip without losing defaults");
+            var cards = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":1,\"windowDurationMins\":300}},\"rateLimitResetCredits\":{\"availableCount\":2}}");
+            check(cards.ResetCreditsCount == 2, "reset credits count is read");
+            cards = parse("{\"rateLimits\":{\"primary\":{\"usedPercent\":1,\"windowDurationMins\":300}},\"rateLimitResetCredits\":{\"availableCount\":0}}");
+            check(cards.ResetCreditsCount == 0, "zero reset credits is known zero");
+            check(partial.ResetCreditsCount == null, "missing reset credits remains unknown");
+            var onlyCards = parse("{\"rateLimitResetCredits\":{\"availableCount\":1,\"credits\":[{\"status\":\"available\",\"resetType\":\"codexRateLimits\",\"expiresAt\":1794003813}]}}");
+            check(onlyCards.FiveHour == null && onlyCards.Weekly == null && onlyCards.ResetCreditsCount == 1, "reset credits can be read without quota windows");
+            check(onlyCards.ResetCreditExpiryDates.Count == 1 && onlyCards.ResetCreditExpiryDates[0] == 1794003813, "reset expiry parsed as Unix seconds");
+            check(DisplayText.CreditExpiry(onlyCards).Contains(DisplayText.ResetUtc(1794003813).ToLocalTime().ToString("yyyy-MM-dd HH:mm")), "expiry displays local calendar time");
+            check(DisplayText.CreditExpiry(cards) == "暂无可用重置卡", "zero credits does not display old expiry");
+            var incomplete = parse("{\"rateLimitResetCredits\":{\"availableCount\":2,\"credits\":[{\"status\":\"available\",\"resetType\":\"codexRateLimits\",\"expiresAt\":1794003813},{\"status\":\"consumed\",\"resetType\":\"codexRateLimits\",\"expiresAt\":100000}]}}");
+            check(incomplete.ResetCreditExpiryDates.Count == 1 && DisplayText.CreditExpiry(incomplete).StartsWith("已知到期"), "consumed credits excluded and incomplete detail identified");
+            check(DisplayText.CreditExpiry(parse("{\"rateLimitResetCredits\":{\"availableCount\":1,\"credits\":null}}")) == "未提供到期日期", "unavailable date not invented");
+            var oldPreferences = Json.Serializer().Deserialize<Preferences>("{\"SizePercent\":100,\"OpacityPercent\":85}");
+            check(oldPreferences.ShowFiveHour && oldPreferences.ShowWeekly && oldPreferences.ShowResetCredits, "existing preferences default to showing all three items");
+            var multipleCards = parse("{\"rateLimitResetCredits\":{\"availableCount\":2,\"credits\":[{\"status\":\"available\",\"resetType\":\"codexRateLimits\",\"expiresAt\":1795003813},{\"status\":\"available\",\"resetType\":\"codexRateLimits\",\"expiresAt\":1794003813}]}}");
+            check(multipleCards.ResetCreditsCount == 2 && DisplayText.CreditExpiry(multipleCards) == "最先到期 " + DisplayText.ResetUtc(1794003813).ToLocalTime().ToString("yyyy-MM-dd HH:mm"), "multiple cards keep total count and earliest expiry regardless of response order");
+            return new { passed = count, success = true };
+        }
+    }
+
 }

@@ -7,6 +7,8 @@ namespace CodexUsageFloat.Tests
 {
     internal static partial class RegressionSuite
     {
+        private const Keys TestShortcut = Keys.Control | Keys.Alt | Keys.F24;
+
         private static void RecoveryCases()
         {
             Case("RECOVERY queued reveal is ignored after form disposal", delegate {
@@ -60,7 +62,7 @@ namespace CodexUsageFloat.Tests
             }
             Case("RECOVERY native hotkey conflict and release", delegate {
                 using (var owner = new Form()) using (var other = new Form())
-                using (var first = new RevealHotkey(Keys.F24)) using (var second = new RevealHotkey(Keys.F24))
+                using (var first = new RevealHotkey(TestShortcut)) using (var second = new RevealHotkey(TestShortcut))
                 {
                     Check(first.Register(owner.Handle), "test chord could not be registered");
                     Check(!second.Register(other.Handle) && second.LastError != 0, "conflicting chord reported as registered");
@@ -71,7 +73,7 @@ namespace CodexUsageFloat.Tests
                 }
             });
             Case("RECOVERY handle recreation preserves hotkey and disposes tray", delegate {
-                var hotkey = new RevealHotkey(Keys.F24);
+                var hotkey = new RevealHotkey(TestShortcut);
                 var form = FormForTest(new Preferences(), null, null, true, hotkey);
                 try
                 {
@@ -79,7 +81,7 @@ namespace CodexUsageFloat.Tests
                     var tray = (NotifyIcon)Field(form, "recoveryTray"); Check(tray.Visible && tray.Icon != null, "tray fallback absent");
                     typeof(Control).GetMethod("RecreateHandle", Hidden).Invoke(form, null);
                     Check(hotkey.Registered && !((ToolStripMenuItem)Field(form, "retryHotkeyItem")).Available, "handle recreation lost hotkey");
-                    using (var contender = new Form()) using (var binding = new RevealHotkey(Keys.F24))
+                    using (var contender = new Form()) using (var binding = new RevealHotkey(TestShortcut))
                     {
                         Check(!binding.Register(contender.Handle), "recreated handle did not own chord");
                         form.Dispose(); Check(!hotkey.Registered && Field(form, "recoveryTray") == null, "dispose retained recovery resources");
@@ -89,10 +91,10 @@ namespace CodexUsageFloat.Tests
                 finally { form.Dispose(); }
             });
             Case("RECOVERY conflict is visible and registration can be retried", delegate {
-                using (var owner = new Form()) using (var blocker = new RevealHotkey(Keys.F24))
+                using (var owner = new Form()) using (var blocker = new RevealHotkey(TestShortcut))
                 {
                     Check(blocker.Register(owner.Handle), "test blocker did not bind");
-                    var hotkey = new RevealHotkey(Keys.F24);
+                    var hotkey = new RevealHotkey(TestShortcut);
                     using (var form = FormForTest(new Preferences(), null, null, true, hotkey))
                     {
                         var retry = (ToolStripMenuItem)Field(form, "retryHotkeyItem");
@@ -100,9 +102,9 @@ namespace CodexUsageFloat.Tests
                         Check(!hotkey.Registered, "conflicting form reported hotkey success");
                         Check(retry.Available && reveal.ShortcutKeyDisplayString.Contains("不可用"), "menu hides registration failure");
                         var tray = (NotifyIcon)Field(form, "recoveryTray");
-                        Check(tray.Visible && tray.ContextMenuStrip == form.ContextMenuStrip && tray.Text.Contains("未注册"), "tray fallback misleading or missing");
+                        Check(tray.Visible && tray.ContextMenuStrip == form.ContextMenuStrip && tray.Text.Contains("不可用"), "tray fallback misleading or missing");
                         blocker.Unregister(); retry.PerformClick();
-                        Check(hotkey.Registered && !retry.Available && reveal.ShortcutKeyDisplayString == "Ctrl+Alt+U", "retry did not recover released shortcut");
+                        Check(hotkey.Registered && !retry.Available && reveal.ShortcutKeyDisplayString == "Ctrl+Alt+F24", "retry did not recover released shortcut");
                     }
                 }
             });
@@ -110,15 +112,17 @@ namespace CodexUsageFloat.Tests
 
         private static void DesktopRecoveryCases()
         {
-            Case("DESKTOP hotkey message and tray double click reveal on current screen", delegate {
-                using (var form = FormForTest(new Preferences(), null, null, true, new RevealHotkey(Keys.F24)))
+            Case("DESKTOP custom hotkey message and tray double click reveal on current screen", delegate {
+                using (var form = FormForTest(new Preferences(), null, null, true, new RevealHotkey(TestShortcut)))
                 {
                     form.Show(); Application.DoEvents();
+                    var binding = (RevealHotkey)Field(form, "revealHotkey");
+                    Check(Call(form, "ApplyShortcut", true, Keys.Control | Keys.Shift | Keys.F23) == null, "custom shortcut could not be applied");
                     var work = Screen.FromPoint(Cursor.Position).WorkingArea;
                     form.Location = new Point(work.Right - form.Width, work.Top + 60);
                     Call(form, "UpdateDockAnchor", false); Call(form, "CollapseDock");
                     form.WindowState = FormWindowState.Minimized;
-                    Native.SendMessage(form.Handle, RevealHotkey.Message, new IntPtr(RevealHotkey.Id), IntPtr.Zero);
+                    Native.SendMessage(form.Handle, RevealHotkey.Message, new IntPtr(binding.MessageId), IntPtr.Zero);
                     Check(WaitUntil(() => !(bool)Field(form, "dockCollapsed") && form.WindowState == FormWindowState.Normal, 2000, true), "hotkey did not restore full widget");
                     Check(form.Bounds == WindowPlacement.Center(form.Size, work), "hotkey did not center on pointer screen");
                     form.Location = new Point(30000, 30000);
@@ -130,7 +134,7 @@ namespace CodexUsageFloat.Tests
                 }
             });
             Case("DESKTOP automatic screen repair preserves foreground and catches messages", delegate {
-                using (var form = FormForTest(new Preferences { EdgeAutoHide = false }, null, null, true, new RevealHotkey(Keys.F24)))
+                using (var form = FormForTest(new Preferences { EdgeAutoHide = false }, null, null, true, new RevealHotkey(TestShortcut)))
                 using (var foreground = new Form { Text = "Recovery focus probe" })
                 {
                     form.Show(); foreground.Show(); foreground.Activate(); Application.DoEvents();

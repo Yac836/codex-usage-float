@@ -6,11 +6,13 @@ A small, read-only Codex quota widget for Windows. 界面目前为中文。
 
 ## 下载便携版
 
-**[下载 Windows 便携版（ZIP，v1.0.0-preview.2）](https://github.com/Yac836/codex-usage-float/releases/download/v1.0.0-preview.2/CodexUsageFloat-windows-x64.zip)**
+**[下载 Windows 便携版（ZIP，v1.0.0-preview.3）](https://github.com/Yac836/codex-usage-float/releases/download/v1.0.0-preview.3/CodexUsageFloat-windows-x64.zip)**
 
-[查看 Release 和更新说明](https://github.com/Yac836/codex-usage-float/releases/tag/v1.0.0-preview.2)
+[查看 Release 和更新说明](https://github.com/Yac836/codex-usage-float/releases/tag/v1.0.0-preview.3)
 
 下载文件名为 `CodexUsageFloat-windows-x64.zip`。解压后双击 `CodexUsageFloat.exe` 即可启动，无需编译或运行脚本。压缩包内有中文 `使用说明.txt`。
+
+更新旧版本时，先从窗口或托盘右键“退出”，再解压覆盖；原有显示偏好会保留。
 
 面向 Windows 10/11 x64，需要 .NET Framework 4.8，以及本机已安装并登录的 Codex。没有安装器、开机启动项或额外 NuGet 依赖。
 
@@ -30,13 +32,15 @@ A small, read-only Codex quota widget for Windows. 界面目前为中文。
 
 ## 找回窗口 / 远程桌面
 
-- **按 `Ctrl+Alt+U`**：展开并居中到鼠标所在屏幕，恢复最小化状态。
+- **默认按 `Ctrl+Alt+U`**：展开并居中到鼠标所在屏幕，恢复最小化状态。
 - **双击托盘图标**：任务栏右下角的蓝紫双环图标，可能在“隐藏的图标”中；右键也有“呼出到当前屏幕”。
 - **再次运行 EXE**：找回已运行的窗口，仍只保留一个实例。
 
 切换单屏远程桌面、移除显示器或缩小工作区后，程序自动检查位置，把窗口移回屏幕内；收起的小条会展开。自动修复不抢占其他应用的键盘焦点。
 
-快捷键被其他程序占用或注册失败时，托盘提示“快捷键未注册”，菜单会显示“快捷键不可用”和重试入口；托盘双击仍可用。远程桌面需要获得键盘焦点，按键未传到远端时使用远端托盘。
+右键窗口或托盘 → **“设置呼出快捷键…”**，勾选 Ctrl/Alt（至少一个，可叠加 Shift），选择字母、数字或 F 键（F12 除外），点击保存。取消勾选“启用呼出快捷键”可关闭，重新启用会保留最后键位，也可恢复默认。选择组合无需实际按出全套按键。
+
+修改时若新组合被占用或无法注册，显示错误并保留原来的绑定和设置。启动时注册失败会显示“快捷键不可用”和重试入口，托盘双击仍可用。软件内部快捷键可能无法提前检测，遇到影响可换键或关闭。远程桌面需要获得键盘焦点，按键未传到远端时使用远端托盘。
 
 蓝色表示 5 小时额度，紫色表示每周额度，金色显示重置卡。默认显示已用比例，可改为剩余。多张卡显示总张数和最先到期日期，悬停查看已返回的明细。未提供的数据显示“—”或缺失提示，不会猜测为零。
 
@@ -46,8 +50,10 @@ A small, read-only Codex quota widget for Windows. 界面目前为中文。
 
 - 不直接读取认证文件，不要求 API Key，不发起模型对话，不使用或消耗重置卡。
 - 不直接向第三方服务器发送数据；Codex 辅助进程通过自身的联网机制取得额度。
-- 仅在 `%LOCALAPPDATA%\CodexUsageFloat\preferences.json` 保存窗口位置和显示选项，正常运行不保存额度历史或日志。
+- 仅在 `%LOCALAPPDATA%\CodexUsageFloat\preferences.json` 保存窗口位置、显示选项和快捷键，正常运行不保存额度历史或日志。
 - 辅助进程由独立 Windows Job Object 管理，读取结束或窗口进程退出时清理所属进程。
+
+程序保持单个原生 WinForms EXE，没有 WebView、全局键盘钩子或新增常驻服务。现有一秒时钟只在倒计时文字或数据失效状态变化时更新界面；每分钟的查询频率不变。开发自检位于测试工程，发布程序不包含这些测试和临时诊断入口。
 
 查找顺序为环境变量 `CODEX_USAGE_FLOAT_CODEX` 指定的现有 EXE、本机 Codex 安装目录、PATH 中的绝对目录。显式配置的路径无效时会报错，不会悄悄改用其他版本。只为可信的 Codex 可执行文件设置该变量。
 

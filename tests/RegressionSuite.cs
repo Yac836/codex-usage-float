@@ -32,7 +32,7 @@ namespace CodexUsageFloat.Tests
             fakeExecutable = Path.GetFullPath(args[1]);
             Directory.CreateDirectory(outputRoot);
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-            CoreCases(); ProcessCases(); LayoutCases(); AsyncCases(); RecoveryCases(); PreviewCases();
+            CoreCases(); ProcessCases(); LayoutCases(); AsyncCases(); RecoveryCases(); ShortcutCases(); PreviewCases();
             if (args.Contains("--desktop")) { DesktopCases(); DesktopRecoveryCases(); }
             string json = Json.Serializer().Serialize(new {
                 success = failed == 0, passed = passed, failed = failed, assertions = assertions,
@@ -102,6 +102,7 @@ namespace CodexUsageFloat.Tests
             bool enableRecovery = false, RevealHotkey hotkey = null)
         {
             string path = Path.Combine(NewDirectory("preferences"), "preferences.json");
+            if (hotkey != null) preferences.HotkeyKeys = (int)hotkey.Shortcut;
             preferences.Save(path);
             var form = new UsageForm(path, reader ?? (token => Sample()), upload, enableRecovery, hotkey);
             form.Text = "Codex Usage Float regression " + Guid.NewGuid().ToString("N");

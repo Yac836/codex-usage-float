@@ -24,6 +24,10 @@ UI 在后台读取结果提交完成前保持刷新锁，防止交错读取覆�
 
 找回入口包括系统 `RegisterHotKey` 注册的 Ctrl+Alt+U、NotifyIcon 托盘双击/菜单和重复启动消息，共用展开、恢复最小化和鼠标所在屏幕居中的逻辑。热键设置 MOD_NOREPEAT；占用/注册失败时不宣称注册成功，提供菜单重试。句柄重建时重新绑定，关闭时注销并释放托盘图标资源，没有键盘钩子。
 
+默认组合可在小型原生设置窗口中修改/关闭；分别保存启用标志和最后键位。候选组合在另一个窗口内热键 ID 上注册成功后才释放旧绑定，失败保留旧状态。设置界面直接选择修饰键和按键，避免捕获组合时触发其他全局快捷键；至少需要 Ctrl/Alt，F12 作为系统保留键不提供。编辑时暂停贴边收起。
+
+秒级时钟继续检查置顶和工作区，只在可见倒计时文字或数据失效状态变化时执行完整显示更新，后台读取、设置修改仍立即更新。临时诊断模式和旧自检不进入发布 EXE，自检保留在测试工程。
+
 处理 WM_DISPLAYCHANGE、WM_SETTINGCHANGE 和本会话注册的 WM_WTSSESSION_CHANGE，合并消息后检查工作区。现有一秒显示时钟同时比较工作区列表，在消息遗漏或屏幕信息延迟更新时兜底，不新增高频定时器。按收起前的完整窗口大小计算位置；优先保留仍可完整显示的位置，否则选择最大重叠工作区，完全丢失时优先鼠标屏幕。自动修复使用不激活窗口的移动；主动找回才请求前台。
 
 Windows API 参考：[RegisterHotKey](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey)、[WM_DISPLAYCHANGE](https://learn.microsoft.com/en-us/windows/win32/gdi/wm-displaychange)、[WM_WTSSESSION_CHANGE](https://learn.microsoft.com/en-us/windows/win32/termserv/wm-wtssession-change)。

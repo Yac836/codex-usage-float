@@ -29,6 +29,7 @@ tests/ProcessCases.cs
 tests/RegressionSuite.cs
 tests/UiCases.cs
 tests/RecoveryCases.cs
+tests/ShortcutCases.cs
 tests/PreviewCases.cs
 tests/run.ps1
 tools/check-source.ps1

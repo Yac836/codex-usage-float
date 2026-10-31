@@ -180,7 +180,7 @@ namespace CodexUsageFloat
                     graphics.FillEllipse(shadow, margin, margin + D(1), Width - 2 * margin, Height - 2 * margin - D(1));
             }
             var face = new RectangleF(D(6), D(6), Width - D(12), Height - D(12));
-            bool stale = snapshot == null || readError != null || DateTime.UtcNow - snapshot.RetrievedUtc > TimeSpan.FromMinutes(3);
+            bool stale = snapshot == null || IsStale(DateTime.UtcNow);
             using (var fill = new LinearGradientBrush(face, Color.FromArgb(30, 39, 53), Color.FromArgb(17, 23, 33), LinearGradientMode.ForwardDiagonal))
                 graphics.FillEllipse(fill, face);
             using (var rim = new Pen(Color.FromArgb(135, 64, 81, 105), Math.Max(1, D(.7f)))) graphics.DrawEllipse(rim, face);
