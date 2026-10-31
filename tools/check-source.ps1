@@ -14,6 +14,11 @@ foreach ($relative in $publicFiles) {
     if ($relative -match '(^[A-Za-z]:|^/|\\|(^|/)\.\.(/|$))') { throw "Unsafe public file path: $relative" }
     $path = Join-Path $ProjectRoot $relative
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing public file: $relative" }
+    if ([System.IO.Path]::GetExtension($path) -eq '.png') {
+        $bytes = [System.IO.File]::ReadAllBytes($path)
+        if ($bytes.Length -lt 8 -or $bytes.Length -gt 2MB -or [BitConverter]::ToString($bytes, 0, 8) -ne '89-50-4E-47-0D-0A-1A-0A') { throw "Invalid or oversized preview PNG: $relative" }
+        continue
+    }
     $text = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)
     foreach ($pattern in $forbidden) {
         if ($text -match $pattern) { throw "Potential private content in public file: $relative (inspect locally; content omitted)" }

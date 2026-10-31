@@ -32,8 +32,8 @@ namespace CodexUsageFloat.Tests
             fakeExecutable = Path.GetFullPath(args[1]);
             Directory.CreateDirectory(outputRoot);
             Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
-            CoreCases(); ProcessCases(); LayoutCases(); AsyncCases();
-            if (args.Contains("--desktop")) DesktopCases();
+            CoreCases(); ProcessCases(); LayoutCases(); AsyncCases(); RecoveryCases(); PreviewCases();
+            if (args.Contains("--desktop")) { DesktopCases(); DesktopRecoveryCases(); }
             string json = Json.Serializer().Serialize(new {
                 success = failed == 0, passed = passed, failed = failed, assertions = assertions,
                 desktopChecksRequested = args.Contains("--desktop"), cases = results
@@ -98,11 +98,12 @@ namespace CodexUsageFloat.Tests
             };
         }
         private static long Unix(DateTime date) { return (long)(date.ToUniversalTime() - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds; }
-        private static UsageForm FormForTest(Preferences preferences, Func<CancellationToken, UsageSnapshot> reader = null, SurfaceUpload upload = null)
+        private static UsageForm FormForTest(Preferences preferences, Func<CancellationToken, UsageSnapshot> reader = null, SurfaceUpload upload = null,
+            bool enableRecovery = false, RevealHotkey hotkey = null)
         {
             string path = Path.Combine(NewDirectory("preferences"), "preferences.json");
             preferences.Save(path);
-            var form = new UsageForm(path, reader ?? (token => Sample()), upload);
+            var form = new UsageForm(path, reader ?? (token => Sample()), upload, enableRecovery, hotkey);
             form.Text = "Codex Usage Float regression " + Guid.NewGuid().ToString("N");
             return form;
         }

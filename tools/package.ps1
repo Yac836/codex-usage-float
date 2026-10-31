@@ -20,6 +20,12 @@ try {
     New-Item -ItemType Directory -Path $binaryStage | Out-Null
     Copy-Item -LiteralPath $ExecutablePath -Destination (Join-Path $binaryStage 'CodexUsageFloat.exe')
     foreach ($name in @('LICENSE', 'README.md', '使用说明.txt')) { Copy-Item -LiteralPath (Join-Path $projectRoot $name) -Destination (Join-Path $binaryStage $name) }
+    $previewFiles = @('docs/images/preview-circle.png', 'docs/images/preview-card.png')
+    foreach ($relative in $previewFiles) {
+        $destination = Join-Path $binaryStage $relative
+        New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $projectRoot $relative) -Destination $destination
+    }
     $sourceStage = Join-Path $stagingRoot 'source'
     New-Item -ItemType Directory -Path $sourceStage | Out-Null
     $publicFiles = @(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'public-files.txt') -Encoding UTF8 | Where-Object { $_.Trim() -and -not $_.StartsWith('#') } | ForEach-Object { $_.Trim() })
@@ -33,7 +39,7 @@ try {
         $target = Join-Path $OutputDirectory $package.Name
         if (Test-Path -LiteralPath $target) { throw "Package already exists; choose a new output directory: $target" }
         $creating = [System.IO.Compression.ZipFile]::Open($target, [System.IO.Compression.ZipArchiveMode]::Create)
-        $entryNames = if ($package.Name -eq 'CodexUsageFloat-source.zip') { $publicFiles } else { @('CodexUsageFloat.exe', 'LICENSE', 'README.md', '使用说明.txt') }
+        $entryNames = if ($package.Name -eq 'CodexUsageFloat-source.zip') { $publicFiles } else { @('CodexUsageFloat.exe', 'LICENSE', 'README.md', '使用说明.txt') + $previewFiles }
         try {
             foreach ($entryName in $entryNames) {
                 [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($creating, (Join-Path $package.Directory $entryName), $entryName, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null

@@ -22,6 +22,12 @@ UI 在后台读取结果提交完成前保持刷新锁，防止交错读取覆�
 
 贴边分为展开与收起状态。保存展开窗口坐标，小条放在当前工作区内。拖动、按键和菜单展开时不收起。再次启动通过本用户会话的互斥体和窗口消息展开、恢复并居中已有窗口。
 
+找回入口包括系统 `RegisterHotKey` 注册的 Ctrl+Alt+U、NotifyIcon 托盘双击/菜单和重复启动消息，共用展开、恢复最小化和鼠标所在屏幕居中的逻辑。热键设置 MOD_NOREPEAT；占用/注册失败时不宣称注册成功，提供菜单重试。句柄重建时重新绑定，关闭时注销并释放托盘图标资源，没有键盘钩子。
+
+处理 WM_DISPLAYCHANGE、WM_SETTINGCHANGE 和本会话注册的 WM_WTSSESSION_CHANGE，合并消息后检查工作区。现有一秒显示时钟同时比较工作区列表，在消息遗漏或屏幕信息延迟更新时兜底，不新增高频定时器。按收起前的完整窗口大小计算位置；优先保留仍可完整显示的位置，否则选择最大重叠工作区，完全丢失时优先鼠标屏幕。自动修复使用不激活窗口的移动；主动找回才请求前台。
+
+Windows API 参考：[RegisterHotKey](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-registerhotkey)、[WM_DISPLAYCHANGE](https://learn.microsoft.com/en-us/windows/win32/gdi/wm-displaychange)、[WM_WTSSESSION_CHANGE](https://learn.microsoft.com/en-us/windows/win32/termserv/wm-wtssession-change)。
+
 ## 测试边界
 
 测试可注入配置路径、读取函数和圆形上传函数，避免接触真实账户。数据与进程测试使用自有模拟服务；离线布局测试使用同一套实际绘制代码。真实鼠标、不同应用之间的覆盖关系和不同 DPI 显示器仍要实机检查。

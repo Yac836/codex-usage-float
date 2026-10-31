@@ -49,6 +49,8 @@ jobs:
             ${{ runner.temp }}/regression/stdout.txt
             ${{ runner.temp }}/regression/stderr.txt
             ${{ runner.temp }}/regression/circle-example.png
+            ${{ runner.temp }}/regression/preview-circle.png
+            ${{ runner.temp }}/regression/preview-card.png
             ${{ runner.temp }}/package-regression/results.json
             ${{ runner.temp }}/package-regression/stdout.txt
             ${{ runner.temp }}/package-regression/stderr.txt

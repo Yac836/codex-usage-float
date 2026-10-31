@@ -585,8 +585,10 @@ namespace CodexUsageFloat
 
         internal UsageForm() : this(null, null) { }
 
-        internal UsageForm(string settingsPath, Func<CancellationToken, UsageSnapshot> reader, SurfaceUpload surfaceUpload = null)
+        internal UsageForm(string settingsPath, Func<CancellationToken, UsageSnapshot> reader, SurfaceUpload surfaceUpload = null,
+            bool enableRecovery = true, RevealHotkey hotkey = null)
         {
+            desktopRecoveryEnabled = enableRecovery;
             preferencePath = settingsPath;
             readUsage = reader ?? (token => new UsageReader().Read(token));
             uploadCircle = surfaceUpload ?? LayeredSurface.Update;
@@ -747,6 +749,7 @@ namespace CodexUsageFloat
             {
                 if (Program.VerificationReport != null) verifiedTicks++;
                 EnsureTopMost(false);
+                CheckScreenLayout();
                 UpdateDisplay();
             };
             refresh.Interval = 60000;
@@ -808,6 +811,7 @@ namespace CodexUsageFloat
                     catch (UnauthorizedAccessException) { }
                 }
             };
+            InitializeRecovery(hotkey);
         }
 
         protected override void Dispose(bool disposing)
@@ -816,6 +820,7 @@ namespace CodexUsageFloat
             {
                 resourcesDisposed = true;
                 closing = true;
+                DisposeRecovery();
                 shutdown.Cancel();
                 countdown.Dispose(); refresh.Dispose(); savePosition.Dispose(); verificationEnd.Dispose(); dockTimer.Dispose();
                 tip.Dispose();
@@ -859,10 +864,12 @@ namespace CodexUsageFloat
             circleLayerConfigured = circleLayerActive = false;
             circleFrameKey = null;
             EnsureTopMost(true);
+            AttachRecoveryHandle();
             if (ready) PostToUi(delegate { RefreshCircleSurface(true); });
         }
         protected override void OnHandleDestroyed(EventArgs e)
         {
+            ReleaseRecoveryHandle();
             circleLayerConfigured = circleLayerActive = false;
             circleFrameKey = null;
             base.OnHandleDestroyed(e);
@@ -874,6 +881,7 @@ namespace CodexUsageFloat
         }
         protected override void WndProc(ref Message message)
         {
+            if (HandleRecoveryMessage(ref message)) return;
             if (message.Msg == RevealMessage && ready && !closing)
             {
                 PostToUi(RevealWindow);
@@ -883,19 +891,20 @@ namespace CodexUsageFloat
         }
         private void RevealWindow()
         {
+            if (closing || IsDisposed) return;
             ExpandDock();
             dockEdge = DockEdge.None;
             dockTimer.Stop();
             outsideSince = null;
             WindowState = FormWindowState.Normal;
-            var work = Screen.PrimaryScreen.WorkingArea;
-            Location = new Point(work.Left + Math.Max(0, (work.Width - Width) / 2),
-                work.Top + Math.Max(0, (work.Height - Height) / 2));
+            var work = Screen.FromPoint(Cursor.Position).WorkingArea;
+            Bounds = WindowPlacement.Center(Size, work);
             expandedBounds = Bounds;
             Show();
             EnsureTopMost(true);
             BringToFront();
             Activate();
+            Native.SetForegroundWindow(Handle);
             SavePosition();
         }
         protected override CreateParams CreateParams
@@ -1054,12 +1063,7 @@ namespace CodexUsageFloat
         }
         private void KeepVisible()
         {
-            var intersect = Screen.AllScreens.Any(screen =>
-            {
-                var r = Rectangle.Intersect(Bounds, screen.WorkingArea);
-                return r.Width >= Math.Min(Width, S(120)) && r.Height >= Math.Min(Height, S(48));
-            });
-            if (!intersect) DefaultLocation();
+            Bounds = WindowPlacement.Fit(Bounds, ReadWorkAreas(), Cursor.Position);
         }
         private void SavePosition()
         {
